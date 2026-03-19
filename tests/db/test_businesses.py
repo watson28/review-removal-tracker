@@ -10,17 +10,22 @@ from review_removal_tracker.db.crud.businesses import (
 from review_removal_tracker.db.models import Business
 
 
-def make_business(**kwargs) -> Business:
-    defaults = dict(
-        place_id="ChIJ_test_001",
-        name="Test Restaurant",
-        category="restaurant",
-        district="Mitte",
-        lat=Decimal("52.520008"),
-        lng=Decimal("13.404954"),
+def make_business(
+    place_id: str = "ChIJ_test_001",
+    name: str = "Test Restaurant",
+    category: str = "restaurant",
+    district: str = "Mitte",
+    lat: Decimal = Decimal("52.520008"),
+    lng: Decimal = Decimal("13.404954"),
+) -> Business:
+    return Business(
+        place_id=place_id,
+        name=name,
+        category=category,
+        district=district,
+        lat=lat,
+        lng=lng,
     )
-    defaults.update(kwargs)
-    return Business(**defaults)
 
 
 def test_upsert_business_inserts(conn):

@@ -23,5 +23,6 @@ packages = ["src/review_removal_tracker"]
 [dependency-groups]
 dev = [
     "hatchling>=1.29.0",
+    "pyrefly>=0.58.0",
     "pytest>=8.0",
 ]

@@ -23,6 +23,7 @@ def make_business(conn, place_id="ChIJ_metrics_test", category="restaurant", dis
             lng=Decimal("13.40"),
         ),
     )
+    assert b.id is not None
     return b.id
 
 
@@ -63,6 +64,7 @@ def test_get_latest_metrics(conn):
     upsert_metrics(conn, make_metrics(bid, computed_date=date(2026, 1, 31), mcs=Decimal("45.0")))
 
     m = get_latest_metrics(conn, bid, window_days=30)
+    assert m is not None
     assert m.computed_date == date(2026, 1, 31)
     assert m.mcs == Decimal("45.0000")
 

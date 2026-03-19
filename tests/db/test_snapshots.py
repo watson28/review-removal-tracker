@@ -23,6 +23,7 @@ def make_business(conn, place_id="ChIJ_snap_test") -> int:
             lng=Decimal("13.40"),
         ),
     )
+    assert b.id is not None
     return b.id
 
 
@@ -69,6 +70,7 @@ def test_get_latest_snapshot(conn):
     upsert_snapshot(conn, DailySnapshot(bid, date(2026, 1, 3), 110, Decimal("4.05")))
 
     latest = get_latest_snapshot(conn, bid)
+    assert latest is not None
     assert latest.snapshot_date == date(2026, 1, 5)
     assert latest.review_count == 120
 
