@@ -173,3 +173,90 @@ def test_search_text_429_raises_rate_limit(httpx_mock, places_client):
     )
     with pytest.raises(PlacesRateLimitError):
         places_client.search_text("restaurant in Mitte, Berlin")
+
+
+# --- Pydantic validation tests ---
+
+def test_get_place_details_invalid_response_shape_raises(httpx_mock, places_client):
+    # userRatingCount must be an int — a non-coercible string should fail validation
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places/ChIJ_abc123",
+        json={"userRatingCount": "not_a_number", "rating": 4.2},
+    )
+    with pytest.raises(PlacesApiError) as exc_info:
+        places_client.get_place_details("ChIJ_abc123")
+    assert exc_info.value.status_code == 200
+    assert "unexpected response shape" in str(exc_info.value)
+
+
+def test_get_place_details_missing_fields_uses_defaults(httpx_mock, places_client):
+    # Empty response body — both fields should fall back to their defaults (0)
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places/ChIJ_abc123",
+        json={},
+    )
+    result = places_client.get_place_details("ChIJ_abc123")
+    assert result is not None
+    assert result.review_count == 0
+    assert result.rating == Decimal("0.0")
+
+
+def test_get_place_details_extra_fields_are_ignored(httpx_mock, places_client):
+    # Google may return additional fields not in the field mask — should be ignored
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places/ChIJ_abc123",
+        json={"userRatingCount": 200, "rating": 4.5, "name": "Some Place", "unknownField": True},
+    )
+    result = places_client.get_place_details("ChIJ_abc123")
+    assert result is not None
+    assert result.review_count == 200
+
+
+def test_search_text_invalid_response_shape_raises(httpx_mock, places_client):
+    # places must be a list — an object should fail validation
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places:searchText",
+        json={"places": "not_a_list"},
+    )
+    with pytest.raises(PlacesApiError) as exc_info:
+        places_client.search_text("restaurant in Mitte, Berlin")
+    assert exc_info.value.status_code == 200
+    assert "unexpected response shape" in str(exc_info.value)
+
+
+def test_search_text_place_missing_id_raises(httpx_mock, places_client):
+    # id is required on each place entry — missing it should fail validation
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places:searchText",
+        json={"places": [{"displayName": {"text": "No ID Place"}}]},
+    )
+    with pytest.raises(PlacesApiError) as exc_info:
+        places_client.search_text("restaurant in Mitte, Berlin")
+    assert "unexpected response shape" in str(exc_info.value)
+
+
+def test_search_text_missing_optional_fields_uses_defaults(httpx_mock, places_client):
+    # Only id is required — all other fields should fall back to defaults
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places:searchText",
+        json={"places": [{"id": "ChIJ_minimal"}]},
+    )
+    results = places_client.search_text("restaurant in Mitte, Berlin")
+    assert len(results) == 1
+    assert results[0].place_id == "ChIJ_minimal"
+    assert results[0].name == ""
+    assert results[0].formatted_address == ""
+    assert results[0].lat == Decimal("0.0")
+    assert results[0].lng == Decimal("0.0")
+    assert results[0].primary_type is None
+
+
+def test_search_text_invalid_location_type_raises(httpx_mock, places_client):
+    # location.latitude must be a float — a string should fail validation
+    httpx_mock.add_response(
+        url="https://places.googleapis.com/v1/places:searchText",
+        json={"places": [{"id": "ChIJ_bad", "location": {"latitude": "north", "longitude": 13.4}}]},
+    )
+    with pytest.raises(PlacesApiError) as exc_info:
+        places_client.search_text("restaurant in Mitte, Berlin")
+    assert "unexpected response shape" in str(exc_info.value)

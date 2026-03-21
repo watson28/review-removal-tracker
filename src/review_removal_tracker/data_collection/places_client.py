@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 import httpx
+from pydantic import BaseModel, ValidationError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -31,6 +32,8 @@ class PlacesRateLimitError(PlacesApiError):
         super().__init__(429, place_id, "rate limit exceeded after retries")
 
 
+# --- Public output types ---
+
 @dataclass
 class PlaceDetails:
     place_id: str
@@ -46,6 +49,35 @@ class DiscoveredPlace:
     lat: Decimal
     lng: Decimal
     primary_type: str | None
+
+
+# --- Pydantic models for Google API response validation ---
+
+class _PlaceDetailsResponse(BaseModel):
+    userRatingCount: int = 0
+    rating: float = 0.0
+
+
+class _DisplayName(BaseModel):
+    text: str = ""
+
+
+class _Location(BaseModel):
+    latitude: float = 0.0
+    longitude: float = 0.0
+
+
+class _SearchResultPlace(BaseModel):
+    id: str
+    displayName: _DisplayName = _DisplayName()
+    formattedAddress: str = ""
+    location: _Location = _Location()
+    primaryType: str | None = None
+
+
+class _TextSearchResponse(BaseModel):
+    places: list[_SearchResultPlace] = []
+    nextPageToken: str | None = None
 
 
 class PlacesClient:
@@ -86,11 +118,15 @@ class PlacesClient:
         if response.status_code != 200:
             raise PlacesApiError(response.status_code, place_id, response.text)
 
-        data = response.json()
+        try:
+            data = _PlaceDetailsResponse.model_validate(response.json())
+        except ValidationError as e:
+            raise PlacesApiError(200, place_id, f"unexpected response shape: {e}") from e
+
         return PlaceDetails(
             place_id=place_id,
-            review_count=int(data.get("userRatingCount", 0)),
-            rating=Decimal(str(data.get("rating", 0))),
+            review_count=data.userRatingCount,
+            rating=Decimal(str(data.rating)),
         )
 
     def search_text(self, text_query: str, max_results: int = 20) -> list[DiscoveredPlace]:
@@ -126,19 +162,22 @@ class PlacesClient:
             if response.status_code != 200:
                 raise PlacesApiError(response.status_code, None, response.text)
 
-            data = response.json()
-            for place in data.get("places", []):
-                location = place.get("location", {})
+            try:
+                data = _TextSearchResponse.model_validate(response.json())
+            except ValidationError as e:
+                raise PlacesApiError(200, None, f"unexpected response shape: {e}") from e
+
+            for place in data.places:
                 results.append(DiscoveredPlace(
-                    place_id=place["id"],
-                    name=place.get("displayName", {}).get("text", ""),
-                    formatted_address=place.get("formattedAddress", ""),
-                    lat=Decimal(str(location.get("latitude", 0))),
-                    lng=Decimal(str(location.get("longitude", 0))),
-                    primary_type=place.get("primaryType"),
+                    place_id=place.id,
+                    name=place.displayName.text,
+                    formatted_address=place.formattedAddress,
+                    lat=Decimal(str(place.location.latitude)),
+                    lng=Decimal(str(place.location.longitude)),
+                    primary_type=place.primaryType,
                 ))
 
-            next_page_token = data.get("nextPageToken")
+            next_page_token = data.nextPageToken
             if not next_page_token:
                 break
 
