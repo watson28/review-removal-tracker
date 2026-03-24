@@ -33,7 +33,7 @@ def test_get_place_details_sets_field_mask(httpx_mock, places_client):
     places_client.get_place_details("ChIJ_abc123")
     request = httpx_mock.get_request()
     assert request is not None
-    assert request.headers["X-Goog-FieldMask"] == PLACE_DETAILS_FIELDS
+    assert request.headers["X-Goog-FieldMask"] == "userRatingCount,rating"
 
 
 def test_get_place_details_sets_api_key(httpx_mock, places_client):

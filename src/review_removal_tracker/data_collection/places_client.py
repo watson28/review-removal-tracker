@@ -15,7 +15,7 @@ from tenacity.wait import wait_base
 logger = logging.getLogger(__name__)
 
 PLACES_BASE_URL = "https://places.googleapis.com/v1"
-PLACE_DETAILS_FIELDS = "places.userRatingCount,places.rating"
+PLACE_DETAILS_FIELDS = "userRatingCount,rating"
 TEXT_SEARCH_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType"
 
 
