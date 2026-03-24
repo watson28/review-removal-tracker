@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 
@@ -11,15 +12,14 @@ PG_PORT = 15432
 PG_USER = "rrt"
 PG_PASSWORD = "rrt"
 PG_DB = "rrt_test"
-DATABASE_URL = f"postgresql+psycopg://{PG_USER}:{PG_PASSWORD}@localhost:{PG_PORT}/{PG_DB}"
+_LOCAL_DATABASE_URL = f"postgresql+psycopg://{PG_USER}:{PG_PASSWORD}@localhost:{PG_PORT}/{PG_DB}"
 
 
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, capture_output=True)
 
 
-@pytest.fixture(scope="session")
-def pg_engine():
+def _start_podman() -> str:
     _run([
         "podman", "run", "--rm", "-d",
         "--name", CONTAINER_NAME,
@@ -29,8 +29,22 @@ def pg_engine():
         "-p", f"{PG_PORT}:5432",
         "docker.io/library/postgres:16",
     ])
+    return _LOCAL_DATABASE_URL
 
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+def _stop_podman() -> None:
+    _run(["podman", "stop", CONTAINER_NAME])
+
+
+@pytest.fixture(scope="session")
+def pg_engine():
+    # In CI, DATABASE_URL is provided via environment (service container).
+    # Locally, spin up a Podman container.
+    ci_url = os.environ.get("TEST_DATABASE_URL")
+    using_podman = ci_url is None
+    database_url = ci_url or _start_podman()
+
+    engine = create_engine(database_url, pool_pre_ping=True)
     deadline = time.time() + 30
     while time.time() < deadline:
         try:
@@ -40,16 +54,17 @@ def pg_engine():
         except Exception:
             time.sleep(0.5)
     else:
-        raise RuntimeError("PostgreSQL container did not become ready in time")
+        raise RuntimeError("PostgreSQL did not become ready in time")
 
     alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
+    alembic_cfg.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(alembic_cfg, "head")
 
     yield engine
 
     engine.dispose()
-    _run(["podman", "stop", CONTAINER_NAME])
+    if using_podman:
+        _stop_podman()
 
 
 @pytest.fixture
