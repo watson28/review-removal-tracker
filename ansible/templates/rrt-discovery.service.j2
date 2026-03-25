@@ -1,0 +1,10 @@
+[Unit]
+Description=Review Removal Tracker — weekly discovery job
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ app_dir }}
+ExecStartPre=docker compose pull -q
+ExecStart=docker compose run --rm app uv run rrt-discovery

@@ -1,0 +1,9 @@
+[Unit]
+Description=Run rrt-discovery weekly on Sunday at 01:00 CET
+
+[Timer]
+OnCalendar=Sun *-*-* 01:00:00 Europe/Berlin
+Persistent=true
+
+[Install]
+WantedBy=timers.target
