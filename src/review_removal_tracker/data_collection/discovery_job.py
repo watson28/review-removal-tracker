@@ -21,12 +21,13 @@ def run_discovery_job(
     conn: Connection,
     client: PlacesClient,
     queries: list[tuple[str, str]],
+    city_name: str = "Berlin",
 ) -> DiscoveryJobResult:
     result = DiscoveryJobResult(total_queries=len(queries))
 
     for category, district in queries:
         try:
-            text_query = f"{category} in {district}, Berlin"
+            text_query = f"{category} in {district}, {city_name}"
             places = client.search_text(text_query)
 
             for place in places:

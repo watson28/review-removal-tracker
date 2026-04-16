@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 PLACES_BASE_URL = "https://places.googleapis.com/v1"
 PLACE_DETAILS_FIELDS = "userRatingCount,rating"
 TEXT_SEARCH_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType"
+NEARBY_SEARCH_FIELDS = (
+    "places.id,places.displayName,places.rating,"
+    "places.userRatingCount,places.location,places.primaryType"
+)
 
 
 class PlacesApiError(Exception):
@@ -51,6 +55,17 @@ class DiscoveredPlace:
     primary_type: str | None
 
 
+@dataclass
+class NearbyPlace:
+    place_id: str
+    name: str
+    review_count: int
+    rating: Decimal
+    lat: Decimal
+    lng: Decimal
+    primary_type: str | None
+
+
 # --- Pydantic models for Google API response validation ---
 
 class _PlaceDetailsResponse(BaseModel):
@@ -78,6 +93,19 @@ class _SearchResultPlace(BaseModel):
 class _TextSearchResponse(BaseModel):
     places: list[_SearchResultPlace] = []
     nextPageToken: str | None = None
+
+
+class _NearbyResultPlace(BaseModel):
+    id: str
+    displayName: _DisplayName = _DisplayName()
+    rating: float = 0.0
+    userRatingCount: int = 0
+    location: _Location = _Location()
+    primaryType: str | None = None
+
+
+class _NearbySearchResponse(BaseModel):
+    places: list[_NearbyResultPlace] = []
 
 
 class PlacesClient:
@@ -182,3 +210,65 @@ class PlacesClient:
                 break
 
         return results[:max_results]
+
+    def search_nearby(
+        self,
+        lat: float,
+        lng: float,
+        radius_m: float,
+        included_types: list[str],
+        max_results: int = 20,
+    ) -> list[NearbyPlace]:
+        body: dict = {
+            "includedTypes": included_types,
+            "maxResultCount": max_results,
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lng},
+                    "radius": radius_m,
+                }
+            },
+            "languageCode": "de",
+        }
+
+        def _call() -> httpx.Response:
+            return self._http.post(
+                f"{PLACES_BASE_URL}/places:searchNearby",
+                json=body,
+                headers={
+                    "X-Goog-Api-Key": self._api_key,
+                    "X-Goog-FieldMask": NEARBY_SEARCH_FIELDS,
+                },
+            )
+
+        retrying = retry(
+            retry=retry_if_exception_type(httpx.TransportError),
+            wait=self._wait,
+            stop=stop_after_attempt(4),
+            reraise=True,
+        )
+        response: httpx.Response = retrying(_call)()
+
+        if response.status_code == 429:
+            raise PlacesRateLimitError()
+
+        if response.status_code != 200:
+            raise PlacesApiError(response.status_code, None, response.text)
+
+        try:
+            data = _NearbySearchResponse.model_validate(response.json())
+        except ValidationError as e:
+            raise PlacesApiError(200, None, f"unexpected response shape: {e}") from e
+
+        return [
+            NearbyPlace(
+                place_id=place.id,
+                name=place.displayName.text,
+                review_count=place.userRatingCount,
+                rating=Decimal(str(place.rating)),
+                lat=Decimal(str(place.location.latitude)),
+                lng=Decimal(str(place.location.longitude)),
+                primary_type=place.primaryType,
+            )
+            for place in data.places
+        ]

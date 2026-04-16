@@ -67,5 +67,34 @@ computed_metrics = Table(
         "business_id", "computed_date", "window_days",
         name="uq_metrics_business_date_window",
     ),
-    CheckConstraint("window_days IN (7, 30, 90)", name="ck_metrics_window_days"),
+    CheckConstraint("window_days IN (14, 30, 90)", name="ck_metrics_window_days"),
+)
+
+grid_cells = Table(
+    "grid_cells",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("center_lat", Numeric(9, 6), nullable=False),
+    Column("center_lng", Numeric(9, 6), nullable=False),
+    Column("radius_meters", Integer, nullable=False, server_default=text("500")),
+    Column("district", String, nullable=True),
+    Column("zone", String, nullable=False, server_default=text("'inner'")),
+    Column("is_active", Boolean, nullable=False, server_default=text("true")),
+    CheckConstraint("zone IN ('inner', 'outer')", name="ck_grid_cells_zone"),
+)
+
+Index("ix_grid_cells_active", grid_cells.c.is_active)
+
+cell_activity = Table(
+    "cell_activity",
+    metadata,
+    Column(
+        "cell_id",
+        Integer,
+        ForeignKey("grid_cells.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("last_hit_date", Date, nullable=True),
+    Column("hit_count", Integer, nullable=False, server_default=text("0")),
+    Column("is_active", Boolean, nullable=False, server_default=text("true")),
 )

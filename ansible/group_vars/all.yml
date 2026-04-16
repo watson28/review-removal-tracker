@@ -2,7 +2,6 @@
 app_dir: /srv/review-removal-tracker
 github_repository: watson28/review-removal-tracker
 github_username: watson28
-discovery_queries: "restaurant:Mitte;hotel:Kreuzberg"
 
 # Secrets — pass via ansible-vault or --extra-vars
 # database_url: postgresql+psycopg://...

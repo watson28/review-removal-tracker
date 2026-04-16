@@ -1,0 +1,47 @@
+name = "Berlin"
+
+# Tighter cells (500m radius) within inner_zone_radius_m of [center];
+# coarser cells (1000m radius) outside.
+inner_zone_radius_m = 5000.0
+inner_cell_radius_m = 500
+outer_cell_radius_m = 1000
+
+[bounds]
+north = 52.6755
+south = 52.3382
+east = 13.7611
+west = 13.0884
+
+[center]
+lat = 52.5200
+lng = 13.4050
+
+# Text Search seeding: cross product of categories x districts is run
+# through Places Text Search to seed the businesses table. Roughly
+# 6 cats * 12 districts * up to 20 results = ~1,400 raw hits, dedup'd
+# by place_id to ~300-500 unique restaurants.
+[discovery]
+categories = [
+    "restaurant",
+    "italian restaurant",
+    "asian restaurant",
+    "turkish restaurant",
+    "vegan restaurant",
+    "cafe",
+]
+districts = [
+    "Mitte",
+    "Friedrichshain",
+    "Kreuzberg",
+    "Prenzlauer Berg",
+    "Neukölln",
+    "Charlottenburg",
+    "Wilmersdorf",
+    "Schöneberg",
+    "Tempelhof",
+    "Wedding",
+    "Moabit",
+    "Treptow",
+    "Pankow",
+    "Weißensee",
+]

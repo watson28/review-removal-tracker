@@ -49,7 +49,6 @@ DB tests require Podman. The session fixture in `tests/db/conftest.py` starts an
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `GOOGLE_API_KEY` | Yes | Google Maps Platform API key |
-| `DISCOVERY_QUERIES` | No | Semicolon-separated `category:district` pairs, e.g. `restaurant:Mitte;hotel:Kreuzberg` |
 | `SKIP_INACTIVE_DAYS` | No | Days of flat review count before skipping a business (default: 14) |
 | `DB_POOL_SIZE` | No | SQLAlchemy pool size (default: 3) |
 | `DB_MAX_OVERFLOW` | No | SQLAlchemy max overflow (default: 2) |

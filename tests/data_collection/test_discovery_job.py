@@ -102,7 +102,7 @@ def test_discovery_job_counts_errors():
     assert result.upserted == 0
 
 
-def test_discovery_job_query_text_format():
+def test_discovery_job_query_text_format_defaults_to_berlin():
     conn = MagicMock()
     client = MagicMock()
     client.search_text.return_value = []
@@ -110,3 +110,13 @@ def test_discovery_job_query_text_format():
     run_discovery_job(conn, client, [("hotel", "Prenzlauer Berg")])
 
     client.search_text.assert_called_once_with("hotel in Prenzlauer Berg, Berlin")
+
+
+def test_discovery_job_query_text_format_uses_city_name():
+    conn = MagicMock()
+    client = MagicMock()
+    client.search_text.return_value = []
+
+    run_discovery_job(conn, client, [("cafe", "Eixample")], city_name="Barcelona")
+
+    client.search_text.assert_called_once_with("cafe in Eixample, Barcelona")

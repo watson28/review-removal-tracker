@@ -7,4 +7,4 @@ After=docker.service
 Type=oneshot
 WorkingDirectory={{ app_dir }}
 ExecStartPre=docker compose pull -q
-ExecStart=docker compose run --rm app uv run rrt-discovery
+ExecStart=docker compose run --rm app uv run python scripts/run_discovery.py
