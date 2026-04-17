@@ -13,3 +13,5 @@ wheels/
 .env
 
 ansible/group_vars/all/secrets.yml
+ansible/inventory.yml
+plans/
