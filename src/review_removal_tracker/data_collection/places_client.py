@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 import httpx
+from opentelemetry import metrics
 from pydantic import BaseModel, ValidationError
 from tenacity import (
     retry,
@@ -118,8 +119,15 @@ class PlacesClient:
         self._api_key = api_key
         self._http = http_client or httpx.Client()
         self._wait = wait or wait_exponential(multiplier=1, min=1, max=30)
+        meter = metrics.get_meter("review_removal_tracker")
+        self._requests_counter = meter.create_counter("rrt.api.requests")
+        self._errors_counter = meter.create_counter("rrt.api.errors")
+        self._rate_limited_counter = meter.create_counter("rrt.api.rate_limited")
 
     def get_place_details(self, place_id: str) -> PlaceDetails | None:
+        method = "place_details"
+        self._requests_counter.add(1, {"method": method})
+
         def _call() -> httpx.Response:
             return self._http.get(
                 f"{PLACES_BASE_URL}/places/{place_id}",
@@ -141,9 +149,11 @@ class PlacesClient:
             return None
 
         if response.status_code == 429:
+            self._rate_limited_counter.add(1, {"method": method})
             raise PlacesRateLimitError(place_id)
 
         if response.status_code != 200:
+            self._errors_counter.add(1, {"method": method, "status": str(response.status_code)})
             raise PlacesApiError(response.status_code, place_id, response.text)
 
         try:
@@ -158,10 +168,12 @@ class PlacesClient:
         )
 
     def search_text(self, text_query: str, max_results: int = 20) -> list[DiscoveredPlace]:
+        method = "text_search"
         results: list[DiscoveredPlace] = []
         next_page_token: str | None = None
 
         while len(results) < max_results:
+            self._requests_counter.add(1, {"method": method})
             body: dict = {"textQuery": text_query, "languageCode": "de"}
             if next_page_token:
                 body["pageToken"] = next_page_token
@@ -185,9 +197,11 @@ class PlacesClient:
             response: httpx.Response = retrying(_call)()
 
             if response.status_code == 429:
+                self._rate_limited_counter.add(1, {"method": method})
                 raise PlacesRateLimitError()
 
             if response.status_code != 200:
+                self._errors_counter.add(1, {"method": method, "status": str(response.status_code)})
                 raise PlacesApiError(response.status_code, None, response.text)
 
             try:
@@ -219,6 +233,9 @@ class PlacesClient:
         included_types: list[str],
         max_results: int = 20,
     ) -> list[NearbyPlace]:
+        method = "nearby_search"
+        self._requests_counter.add(1, {"method": method})
+
         body: dict = {
             "includedTypes": included_types,
             "maxResultCount": max_results,
@@ -250,9 +267,11 @@ class PlacesClient:
         response: httpx.Response = retrying(_call)()
 
         if response.status_code == 429:
+            self._rate_limited_counter.add(1, {"method": method})
             raise PlacesRateLimitError()
 
         if response.status_code != 200:
+            self._errors_counter.add(1, {"method": method, "status": str(response.status_code)})
             raise PlacesApiError(response.status_code, None, response.text)
 
         try:

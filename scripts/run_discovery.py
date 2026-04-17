@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 from review_removal_tracker.config import get_settings
@@ -20,6 +21,7 @@ from review_removal_tracker.data_collection.discovery_job import run_discovery_j
 from review_removal_tracker.data_collection.places_client import PlacesClient
 from review_removal_tracker.db.engine import get_connection
 from review_removal_tracker.grid.city import load_city_config
+from review_removal_tracker.telemetry import init_metrics, shutdown_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -63,18 +65,34 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     settings = get_settings()
+
+    meter = init_metrics("rrt-discovery", endpoint=settings.otel_exporter_endpoint)
+    queries_counter = meter.create_counter("rrt.discovery.total_queries")
+    upserted_counter = meter.create_counter("rrt.discovery.upserted")
+    errors_counter = meter.create_counter("rrt.discovery.errors")
+    duration_gauge = meter.create_gauge("rrt.discovery.duration_seconds")
     if not settings.google_api_key:
         logger.error("GOOGLE_API_KEY is not set — cannot run discovery")
         return 1
 
     client = PlacesClient(api_key=settings.google_api_key)
+
+    start = time.monotonic()
     with get_connection() as conn:
         result = run_discovery_job(conn, client, queries, city_name=city.name)
+    elapsed = time.monotonic() - start
+
+    queries_counter.add(result.total_queries)
+    upserted_counter.add(result.upserted)
+    errors_counter.add(result.errors)
+    duration_gauge.set(elapsed)
 
     logger.info(
-        "Discovery done for %s: %d queries, %d upserted, %d errors",
-        city.name, result.total_queries, result.upserted, result.errors,
+        "Discovery done for %s: %d queries, %d upserted, %d errors (%.1fs)",
+        city.name, result.total_queries, result.upserted, result.errors, elapsed,
     )
+
+    shutdown_metrics()
     return 0 if result.errors == 0 else 2
 
 
