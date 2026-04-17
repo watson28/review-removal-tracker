@@ -1,8 +1,8 @@
 [Unit]
-Description=Run rrt-snapshot daily at 03:00 CET
+Description=Run rrt-snapshot every 2 days at 03:00 CET
 
 [Timer]
-OnCalendar=*-*-* 03:00:00 Europe/Berlin
+OnCalendar=*-*-1/2 03:00:00 Europe/Berlin
 Persistent=true
 
 [Install]
