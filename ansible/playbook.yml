@@ -9,6 +9,7 @@
         name:
           - docker.io
           - docker-compose-plugin
+          - containerd
         state: present
         update_cache: true
 

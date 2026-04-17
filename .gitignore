@@ -11,3 +11,5 @@ wheels/
 
 # Environment secrets
 .env
+
+ansible/group_vars/all/secrets.yml
